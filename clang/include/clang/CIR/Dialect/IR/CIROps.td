@@ -2622,6 +2622,56 @@ def StackRestoreOp : CIR_Op<"stack_restore"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Atomic operations
+//===----------------------------------------------------------------------===//
+
+def AtomicOpKind_Add : I32EnumAttrCase<"Add", 1, "add">;
+def AtomicOpKind_Sub : I32EnumAttrCase<"Sub", 2, "sub">;
+def AtomicOpKind_And : I32EnumAttrCase<"And", 3, "and">;
+def AtomicOpKind_Or : I32EnumAttrCase<"Or", 4, "or">;
+def AtomicOpKind_Xor : I32EnumAttrCase<"Xor", 5, "xor">;
+def AtomicOpKind_Nand : I32EnumAttrCase<"Nand", 6, "nand">;
+def AtomicOpKind_Min : I32EnumAttrCase<"Min", 7, "min">;
+def AtomicOpKind_Max : I32EnumAttrCase<"Max", 8, "max">;
+def AtomicOpKind_Umin : I32EnumAttrCase<"UMin", 9, "uin">;
+def AtomicOpKind_Umax : I32EnumAttrCase<"UMax", 10, "umax">;
+
+def AtomicFetchAndOpKind : I32EnumAttr<"AtomicRmwOp", "atomic op", [
+  AtomicOpKind_Add, AtomicOpKind_Sub, AtomicOpKind_And, AtomicOpKind_Or,
+  AtomicOpKind_Xor, AtomicOpKind_Nand, AtomicOpKind_Max, AtomicOpKind_Min,
+  AtomicOpKind_Umax, AtomicOpKind_Umin
+]> {
+  let cppNamespace = "::mlir::cir";
+}
+
+def SyncFetchAndOp : CIR_Op<"syncFetchAndOp", [
+  TypesMatchWith<"result #0 and operand #2 have the same type", "value", "result", "$_self">
+  ]> {
+  let summary = "Atomically performs the operation and returns the old value.";
+  let arguments = (ins Arg<AtomicFetchAndOpKind, "atomic op kind">:$kind,
+                       CIR_PointerType:$addr,
+                       CIR_IntType:$value);
+  let results = (outs CIR_IntType:$result);
+
+  let assemblyFormat = [{
+    `(` 
+      $kind 
+      `,` `(` $addr `:` `cir.ptr` type($addr) `)` 
+      `,` `(` $value `:` type($value) `)`
+    `)` `->` type($result) attr-dict
+  }];
+}
+
+// def SyncOpAndFetch : CIR_Op<"syncOpAndFetch", [Pure, SameOperandsAndResultType]> {
+//   let summary = "";
+//   let arguments = (ins CIR_PointerType:$memory_loc,
+//                        AnyType:$exchange_type);
+// }
+
+// def CompareAndSwapOp : CIR_Op<"CompareAndSwapOp", [Pure, SameOperandsAndResultType]> { 
+// }
+
+//===----------------------------------------------------------------------===//
 // Operations Lowered Directly to LLVM IR
 //
 // These operations are hacks to get around missing features in LLVM's dialect.

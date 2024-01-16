@@ -577,25 +577,46 @@ public:
                                elseBlock->end());
 
     rewriter.replaceOp(op, ifOp);
-    return mlir::success();
   }
 };
 
-class CIRYieldOpLowering
-    : public mlir::OpConversionPattern<mlir::cir::YieldOp> {
-public:
-  using OpConversionPattern<mlir::cir::YieldOp>::OpConversionPattern;
-  mlir::LogicalResult
-  matchAndRewrite(mlir::cir::YieldOp op, OpAdaptor adaptor,
+class CIRAtomicOpLowering
+: public mlir::OpConversionPattern<mlir::cir::SyncFetchAndOp> {
+  using mlir::OpConversionPattern<mlir::cir::SyncFetchAndOp>::OpConversionPattern;
+mlir::LogicalResult
+  matchAndRewrite(mlir::cir::SyncFetchAndOp syncOp, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto *parentOp = op->getParentOp();
-    return llvm::TypeSwitch<mlir::Operation *, mlir::LogicalResult>(parentOp)
-        .Case<mlir::scf::IfOp>([&](auto) {
-          rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(
-              op, adaptor.getOperands());
-          return mlir::success();
-        })
-        .Default([](auto) { return mlir::failure(); });
+    const auto mem = adaptor.getAddr();
+    const auto val = adaptor.getValue();
+    const auto rmw_kind = [&adaptor]() -> mlir::arith::AtomicRMWKind {
+      switch (adaptor.getKind()){
+        case mlir::cir::AtomicRmwOp::Add:
+          return mlir::arith::AtomicRMWKind::addi;
+        case mlir::cir::AtomicRmwOp::And:
+          return mlir::arith::AtomicRMWKind::andi;
+        case mlir::cir::AtomicRmwOp::Or:
+          return mlir::arith::AtomicRMWKind::ori;
+        case mlir::cir::AtomicRmwOp::Max:
+          return mlir::arith::AtomicRMWKind::maxs;
+        case mlir::cir::AtomicRmwOp::Min:
+          return mlir::arith::AtomicRMWKind::mins;
+        case mlir::cir::AtomicRmwOp::UMax:
+          return mlir::arith::AtomicRMWKind::maxu;
+        case mlir::cir::AtomicRmwOp::UMin:
+          return mlir::arith::AtomicRMWKind::minu;
+        case mlir::cir::AtomicRmwOp::Nand:
+          // return mlir::arith::AtomicRMWKind::nandi;
+        case mlir::cir::AtomicRmwOp::Sub:
+          // return mlir::arith::AtomicRMWKind::subi;
+        case mlir::cir::AtomicRmwOp::Xor:
+          // return mlir::arith::AtomicRMWKind::xor;
+        break;
+    }
+    llvm_unreachable("Invalid AtomicRMWKind");
+    }();
+
+    // rewriter.replaceOpWithNewOp<mlir::memref::AtomicRMWOp>(syncOp, rmw_kind, val, mem);
+    return mlir::success();
   }
 };
 
